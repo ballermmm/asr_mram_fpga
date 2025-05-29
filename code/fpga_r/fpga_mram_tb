@@ -1,0 +1,87 @@
+module fpga_mram_tb;
+    // 时钟和复位信号
+    reg CLK_200;
+    reg Rst_n;
+    reg rd_trigger;
+    
+    // MRAM接口信号
+    reg [7:0] out_from_mram;
+    
+    // 输出信号
+    wire W_CLK;
+    wire R_CLK;
+    wire EN;
+    wire WR;
+    wire dir;
+    wire OE_D;
+    wire OE_OUT;
+    wire TURNOVER;
+    wire OUTSEL;
+    wire [7:0] output_nn;
+    wire CLK_FIFO;
+    
+    // 实例化被测模块
+    fpga_mram #(
+        .debug_mode(1'b1),    // 启用调试模式
+        .ECC_EN(1'b1),        // 启用ECC
+        .DATA_BYTES(8'd10)    // 测试少量数据
+    ) uut (
+        .CLK_200(CLK_200),
+        .rd_trigger(rd_trigger),
+        .out_from_mram(out_from_mram),
+        .W_CLK(W_CLK),
+        .R_CLK(R_CLK),
+        .EN(EN),
+        .WR(WR),
+        .dir(dir),
+        .OE_D(OE_D),
+        .OE_OUT(OE_OUT),
+        .TURNOVER(TURNOVER),
+        .OUTSEL(OUTSEL),
+        .output_nn(output_nn),
+        .CLK_FIFO(CLK_FIFO)
+    );
+    
+    // 时钟生成
+    initial begin
+        CLK_200 = 0;
+        forever #2.5 CLK_200 = ~CLK_200; // 200MHz时钟
+    end
+    
+    // 测试激励
+    initial begin
+        // 初始化
+        Rst_n = 0;
+        rd_trigger = 0;
+        out_from_mram = 8'h00;
+        
+        // 复位
+        #100 Rst_n = 1;
+        
+        // 等待复位完成
+        #100;
+        
+        // 测试场景1：正常读取
+        rd_trigger = 1;
+        out_from_mram = 8'hA5; // 测试数据
+        #100;
+        
+        // 测试场景2：ECC错误检测
+        out_from_mram = 8'h55; // 不同的测试数据
+        #100;
+        
+        // 测试场景3：连续读取
+        repeat(5) begin
+            out_from_mram = out_from_mram + 1;
+            #100;
+        end
+        
+        // 结束测试
+        #1000 $finish;
+    end
+    
+    // 监控输出
+    initial begin
+        $monitor("Time=%t, output_nn=%h, state=%h", $time, output_nn, uut.state);
+    end
+endmodule
